@@ -1,0 +1,23 @@
+<?php
+
+/**
+ * @file
+ * Hook implementations for the cmc module.
+ */
+
+declare(strict_types=1);
+
+use Drupal\cmc\EventSubscriber\LoadedEntitySubscriber;
+use Drupal\Core\Entity\EntityInterface;
+
+/**
+ * Implements hook_entity_load().
+ */
+function cmc_entity_load(array $entities, $entity_type_id) {
+  foreach ($entities as $entity) {
+    assert($entity instanceof EntityInterface);
+    $loaded_entity_subscriber = \Drupal::service('cmc.loaded_entity_subscriber');
+    assert($loaded_entity_subscriber instanceof LoadedEntitySubscriber);
+    $loaded_entity_subscriber->registerLoadedEntity($entity);
+  }
+}

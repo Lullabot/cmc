@@ -1,0 +1,6 @@
+services:
+  cmc.loaded_entity_subscriber:
+    class: Drupal\cmc\EventSubscriber\LoadedEntitySubscriber
+    arguments: ['@module_handler', '@config.factory', '@theme.manager', '@request_stack', '@current_route_match']
+    tags:
+      - { name: event_subscriber }

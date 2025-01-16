@@ -1,0 +1,16 @@
+cmc.settings:
+  type: config_object
+  label: 'CMC settings'
+  mapping:
+    operation_mode:
+      type: string
+      label: 'Operation mode'
+    front_end_only:
+      type: boolean
+      label: 'Check front-end only'
+    skip_urls:
+      label: URLs to be skipped
+      type: sequence
+      orderby: value
+      sequence:
+        type: string

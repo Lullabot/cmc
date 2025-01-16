@@ -1,0 +1,9 @@
+cmc.settings:
+  path: '/admin/config/development/cmc'
+  defaults:
+    _form: '\Drupal\cmc\Form\CmcSettingsForm'
+    _title: 'CMC settings'
+  requirements:
+    _permission: 'administer site configuration'
+  options:
+    _admin_route: TRUE
