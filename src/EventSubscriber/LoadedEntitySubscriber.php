@@ -145,8 +145,6 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     if (!empty($diff)) {
       if ($operation_mode === 'errors') {
         $html = $this->generateHtmlErrorMessage($response, $diff);
-        // @todo Troubleshoot this further. It seems not to work well with
-        // BigPipe.
         if (!empty($html)) {
           $response->setContent($html);
         }
@@ -173,14 +171,6 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    *   TRUE if this entity should be tracked, FALSE otherwise.
    */
   private function shouldTrack(EntityInterface $entity): bool {
-    // Only content entities for now.
-    if (!($entity instanceof ContentEntityInterface)) {
-      return FALSE;
-    }
-    // Skip this one as we expect it will be caught by the node cache tag.
-    if ($entity instanceof ContentModerationState) {
-      return FALSE;
-    }
     // Allow modules to modify this.
     $skip = $this->moduleHandler->invokeAll('cmc_skip_tracking', [$entity]);
     // If at least one module wants to skip the tracking, bail out.
@@ -204,20 +194,24 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
   private function generateHtmlErrorMessage(CacheableResponseInterface $response, array $diff): string {
     $html = '';
     $crawler = new Crawler($response->getContent());
-    $body = $crawler->filterXPath('//div[@class="layout-container"]');
+    $body = $crawler->filterXPath('//body');
     if ($body->count() > 0) {
-      $warnings = '<p>The following cache tags were not applied to the page.</p><ol><li><pre>' . implode('</pre></li><li><pre>', $diff) . '</pre></li></ol>';
-      $tag = '<div';
-      if ($body->getNode(0)->hasAttributes()) {
-        foreach ($body->getNode(0)->attributes as $attribute) {
-          $tag .= sprintf(' %s="%s"', $attribute->nodeName, htmlspecialchars($attribute->nodeValue, ENT_QUOTES));
-        }
-      }
-      // Close the opening tag.
-      $tag .= '>';
-      $html = str_replace($tag,
-        $tag . $warnings,
-        $response->getContent());
+      $tags_markup = implode('</pre></li><li><pre>', $diff);
+      $errors = <<<MARKUP
+<div id="cmc-errors">
+  <h2>The following cache tags were not applied to the page:</h2>
+  <ol>
+    <li><pre>
+    {$tags_markup}
+    </pre></li>
+  </ol>
+</div>
+MARKUP;
+      $html = preg_replace(
+        '/<body([^>]*)>/i',
+        '<body$1>' . $errors,
+        $response->getContent()
+      );
     }
     return $html;
   }
