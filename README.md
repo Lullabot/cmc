@@ -81,11 +81,32 @@ To use the sniff:
    ```bash
    vendor/bin/phpcs --config-set installed_paths /path/to/web/modules/custom/cmc/phpcs
    ```
+Note: the example above will set your `installed_paths` to include only the
+path to this module's sniffers, which is likely not what you want. You can pass
+a comma-separated list of paths to the above command, or include the line below
+in your `phpcs.xml.dist` configuration file, if you are using one:
+
+```
+<config name="installed_paths" value="../../drupal/coder/coder_sniffer,../../sirbrillig/phpcs-variable-analysis,../../slevomat/coding-standard,../../../web/modules/custom/cmc/phpcs" />
+```
+
+If you are using a `phpcs.xml.dist` configuration file in your project, you may
+also want to add the standard directly there:
+
+```
+<rule ref="web/modules/custom/cmc/phpcs/ruleset.xml"/>
+```
+
+Also make sure you allow `twig` as one of the extensions to be sniffed, in case
+you have an `<arg name="extensions">` config value.
 
 3. Run the sniffer:
    ```bash
    vendor/bin/phpcs --standard=CMC /path/to/your/templates
    ```
+
+If you included the standard in your `phpcs.xml.dist` configuration file, you
+can omit the `--standard=CMC` flag mentioned above.
 
 Example warning:
 ```
@@ -94,7 +115,7 @@ FILE: /path/to/template.html.twig
 FOUND 1 WARNING AFFECTING 1 LINE
 --------------------------------------------------------------------------------
  15 | WARNING | Direct field access using "node.field_image" is not recommended.
-    |         | Use field.html.twig templates or content variable instead
+    |         | Try to always render full variables that come from the backend.
 --------------------------------------------------------------------------------
 ```
 
@@ -104,4 +125,4 @@ Instead of direct field access, use:
 {{ content.field_image }}
 
 {# Not recommended #}
-{{ node.field_image }}
+{{ node.field_image.value }}

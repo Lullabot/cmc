@@ -1,10 +1,10 @@
 <?xml version="1.0"?>
 <ruleset name="CMC">
-  <description>Custom coding standards for CMC module.</description>
+  <description>Custom coding standards for the CMC module.</description>
 
   <!-- Include our custom sniffs -->
-  <rule ref="Drupal\cmc\Sniffs\Twig\DirectFieldAccessSniff"/>
+  <rule ref="./Sniffs/Twig/DirectFieldAccessSniff.php"/>
 
   <!-- Define file extensions to check -->
   <arg name="extensions" value="html.twig"/>
-</ruleset> 
+</ruleset>
