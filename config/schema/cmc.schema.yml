@@ -10,9 +10,9 @@ cmc.settings:
           - disabled
           - errors
           - strict
-    front_end_only:
+    skip_admin:
       type: boolean
-      label: 'Check front-end only'
+      label: 'Skip admin pages'
     skip_urls:
       label: URLs to be skipped
       type: sequence

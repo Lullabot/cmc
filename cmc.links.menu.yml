@@ -3,4 +3,3 @@ cmc.settings:
   description: 'Configure Cacheability Metadata Checker settings.'
   parent: system.admin_config_development
   route_name: cmc.settings
-  weight: 100

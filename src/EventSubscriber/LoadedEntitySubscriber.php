@@ -111,8 +111,8 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
 
     // Skip checking if this is an admin page and the config is set to only
     // check front-end pages.
-    $only_front_end = $this->config->get('front_end_only') ?? TRUE;
-    if ($only_front_end) {
+    $skip_admin = $this->config->get('skip_admin') ?? TRUE;
+    if ($skip_admin) {
       $active_theme = $this->themeManager->getActiveTheme()->getName();
       $admin_theme = $this->configFactory->get('system.theme')->get('admin');
       if ($active_theme === $admin_theme) {
@@ -136,7 +136,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     // Never fail hard on our own config page to avoid smart users locking
     // themselves out of the house.
     if ($operation_mode === 'strict' &&
-      !$only_front_end &&
+      !$skip_admin &&
       $this->routeMatch->getRouteName() === 'cmc.settings') {
       return;
     }
