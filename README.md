@@ -13,6 +13,7 @@ The Cacheability Metadata Checker monitors entity loads during page requests and
 - Option to check only front-end pages or include admin pages
 - Ability to skip specific URLs
 - API for other modules to exclude certain entities from tracking
+- Custom PHPCS sniff for Twig template best practices
 
 ## Configuration
 
@@ -57,3 +58,50 @@ function mymodule_cmc_skip_tracking(EntityInterface $entity): bool {
 2. Use "Display errors" mode on staging environments for visual feedback
 3. Disable the module in production environments
 4. Consider excluding admin pages if you're only concerned with front-end caching
+
+## Coding Standards
+
+The module includes a custom PHPCS sniff that helps maintain Drupal best practices in Twig templates:
+
+### Direct Field Access Sniff
+
+This sniff detects direct field access in Twig templates using the pattern `node.field_foo`. This pattern is discouraged because:
+- It bypasses field formatters and rendering systems
+- It makes templates less maintainable
+- It can lead to security issues if proper escaping isn't used
+
+To use the sniff:
+
+1. Install development dependencies:
+   ```bash
+   composer require --dev drupal/coder squizlabs/php_codesniffer
+   ```
+
+2. Register the custom standard:
+   ```bash
+   vendor/bin/phpcs --config-set installed_paths /path/to/web/modules/custom/cmc/phpcs
+   ```
+
+3. Run the sniffer:
+   ```bash
+   vendor/bin/phpcs --standard=CMC /path/to/your/templates
+   ```
+
+Example warning:
+```
+FILE: /path/to/template.html.twig
+--------------------------------------------------------------------------------
+FOUND 1 WARNING AFFECTING 1 LINE
+--------------------------------------------------------------------------------
+ 15 | WARNING | Direct field access using "node.field_image" is not recommended.
+    |         | Use field.html.twig templates or content variable instead
+--------------------------------------------------------------------------------
+```
+
+Instead of direct field access, use:
+```twig
+{# Recommended #}
+{{ content.field_image }}
+
+{# Not recommended #}
+{{ node.field_image }}
