@@ -5,9 +5,14 @@ cmc.settings:
     operation_mode:
       type: string
       label: 'Operation mode'
-    front_end_only:
+      constraint:
+        Choice:
+          - disabled
+          - errors
+          - strict
+    skip_admin:
       type: boolean
-      label: 'Check front-end only'
+      label: 'Skip admin pages'
     skip_urls:
       label: URLs to be skipped
       type: sequence

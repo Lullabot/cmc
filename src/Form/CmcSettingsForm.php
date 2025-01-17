@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Drupal\cmc\Form;
 
 use Drupal\Core\Form\ConfigFormBase;
+use Drupal\Core\Form\ConfigTarget;
 use Drupal\Core\Form\FormStateInterface;
 
 /**
@@ -41,40 +42,32 @@ class CmcSettingsForm extends ConfigFormBase {
         'errors' => $this->t('Display errors'),
         'strict' => $this->t('Strict'),
       ],
-      '#default_value' => $config->get('operation_mode') ?? 'disabled',
+      '#config_target' => 'cmc.settings:operation_mode',
     ];
 
-    $form['front_end_only'] = [
+    $form['skip_admin'] = [
       '#type' => 'checkbox',
-      '#title' => $this->t('Check front-end only'),
+      '#title' => $this->t('Skip admin pages'),
       '#description' => $this->t('When enabled, cache tags will only be checked on pages using the default theme (front-end). When disabled, admin pages will be checked as well.'),
-      '#default_value' => $config->get('front_end_only') ?? TRUE,
+      '#config_target' => 'cmc.settings:skip_admin',
     ];
 
     $form['skip_urls'] = [
       '#type' => 'textarea',
       '#title' => $this->t('Skip URLs'),
       '#description' => $this->t("A comma or new-line separated list of relative URLs that should not be checked."),
-      '#default_value' => implode("\r\n", $config->get('skip_urls') ?: []),
+      '#default_value' => implode("\r\n", $config->get('skip_urls')),
+      '#config_target' => new ConfigTarget(
+        'cmc.settings',
+        'skip_urls',
+        // Converts config value to a form value.
+        fn($value) => implode("\r\n", $value),
+        // Converts form value to a config value.
+        fn($value) => array_map('trim', explode("\r\n", trim($value))),
+      ),
     ];
 
     return parent::buildForm($form, $form_state);
-  }
-
-  /**
-   * {@inheritdoc}
-   */
-  public function submitForm(array &$form, FormStateInterface $form_state) {
-    $skip_urls = preg_replace('/[\s, ]/', ',', $form_state->getValue('skip_urls'));
-    $skip_urls = array_values(array_filter(explode(',', $skip_urls)));
-
-    $this->config('cmc.settings')
-      ->set('operation_mode', $form_state->getValue('operation_mode'))
-      ->set('front_end_only', $form_state->getValue('front_end_only'))
-      ->set('skip_urls', $skip_urls)
-      ->save();
-
-    parent::submitForm($form, $form_state);
   }
 
 }

@@ -25,7 +25,7 @@ Visit `/admin/config/development/cmc` to configure the module. The following opt
 - **Display errors**: Shows missing cache tags at the top of affected pages
 - **Strict**: Throws exceptions when cache tags are missing (recommended for development)
 
-### Front-end Only
+### Skip Admin Pages
 
 When enabled (default), the module only checks pages using the default theme. When disabled, it also checks admin pages using the admin theme.
 
