@@ -1,0 +1,21 @@
+cmc.settings:
+  type: config_object
+  label: 'CMC settings'
+  mapping:
+    operation_mode:
+      type: string
+      label: 'Operation mode'
+      constraint:
+        Choice:
+          - disabled
+          - errors
+          - strict
+    skip_admin:
+      type: boolean
+      label: 'Skip admin pages'
+    skip_urls:
+      label: URLs to be skipped
+      type: sequence
+      orderby: value
+      sequence:
+        type: string

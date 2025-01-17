@@ -1,0 +1,3 @@
+operation_mode: 'disabled'
+skip_admin: true
+skip_urls: []
