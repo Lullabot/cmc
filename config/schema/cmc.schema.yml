@@ -5,6 +5,11 @@ cmc.settings:
     operation_mode:
       type: string
       label: 'Operation mode'
+      constraint:
+        Choice:
+          - disabled
+          - errors
+          - strict
     front_end_only:
       type: boolean
       label: 'Check front-end only'

@@ -41,21 +41,21 @@ class CmcSettingsForm extends ConfigFormBase {
         'errors' => $this->t('Display errors'),
         'strict' => $this->t('Strict'),
       ],
-      '#default_value' => $config->get('operation_mode') ?? 'disabled',
+      '#default_value' => $config->get('operation_mode'),
     ];
 
     $form['front_end_only'] = [
       '#type' => 'checkbox',
       '#title' => $this->t('Check front-end only'),
       '#description' => $this->t('When enabled, cache tags will only be checked on pages using the default theme (front-end). When disabled, admin pages will be checked as well.'),
-      '#default_value' => $config->get('front_end_only') ?? TRUE,
+      '#default_value' => $config->get('front_end_only'),
     ];
 
     $form['skip_urls'] = [
       '#type' => 'textarea',
       '#title' => $this->t('Skip URLs'),
       '#description' => $this->t("A comma or new-line separated list of relative URLs that should not be checked."),
-      '#default_value' => implode("\r\n", $config->get('skip_urls') ?: []),
+      '#default_value' => implode("\r\n", $config->get('skip_urls')),
     ];
 
     return parent::buildForm($form, $form_state);
