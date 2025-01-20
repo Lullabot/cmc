@@ -1,14 +1,11 @@
 # Cacheability Metadata Checker (CMC)
 
-A Drupal module that helps developers identify missing cache tags in their pages by tracking loaded entities and verifying their cache tags are properly bubbled up to the response.
-
-## Overview
-
-The Cacheability Metadata Checker monitors entity loads during page requests and verifies that all cache tags from those entities are present in the final response. This helps ensure proper cache invalidation by catching situations where entity cache tags are accidentally stripped or forgotten.
+A Drupal module that helps developers identify missing cache tags in their pages by tracking loaded entities and
+verifying their cache tags are properly bubbled up to the response.
 
 ## Features
 
-- Tracks loaded content entities and their cache tags
+- Tracks loaded entities and their cache tags, compares with tags bubbled to the HTTP response object
 - Configurable operation modes (disabled, display errors, strict)
 - Option to check only front-end pages or include admin pages
 - Ability to skip specific URLs
@@ -27,7 +24,8 @@ Visit `/admin/config/development/cmc` to configure the module. The following opt
 
 ### Skip Admin Pages
 
-When enabled (default), the module only checks pages using the default theme. When disabled, it also checks admin pages using the admin theme.
+When enabled (default), the module only checks pages using the default theme. When disabled, it also checks admin
+pages using the admin theme.
 
 ### Skip URLs
 
@@ -54,10 +52,10 @@ function mymodule_cmc_skip_tracking(EntityInterface $entity): bool {
 
 ## Best Practices
 
-1. Enable "Strict" mode during development to catch cache tag issues early
-2. Use "Display errors" mode on staging environments for visual feedback
-3. Disable the module in production environments
-4. Consider excluding admin pages if you're only concerned with front-end caching
+1. Enable "Strict" mode during development to catch cache tag issues early.
+2. Use "Display errors" mode on staging environments for visual feedback or to use tools such as VisualDiff tests.
+3. Never enable the module in production environments.
+4. Consider excluding admin pages to avoid unrelated issues when developing the front-end theme.
 
 ## Coding Standards
 
@@ -65,12 +63,11 @@ The module includes a custom PHPCS sniff that helps maintain Drupal best practic
 
 ### Direct Field Access Sniff
 
-This sniff detects direct field access in Twig templates using the pattern `node.field_foo`. This pattern is discouraged because:
-- It bypasses field formatters and rendering systems
-- It makes templates less maintainable
-- It can lead to security issues if proper escaping isn't used
+This sniff detects direct field access in Twig templates using patterns like `node.field_*`, `content.field_*`, etc.
+This pattern is discouraged because it may introduce caching bugs by leaving out the proper cache tags in the top-level
+render array.
 
-To use the sniff:
+#### Installation
 
 1. Install development dependencies:
    ```bash
@@ -81,32 +78,72 @@ To use the sniff:
    ```bash
    vendor/bin/phpcs --config-set installed_paths /path/to/web/modules/custom/cmc/phpcs
    ```
-Note: the example above will set your `installed_paths` to include only the
-path to this module's sniffers, which is likely not what you want. You can pass
-a comma-separated list of paths to the above command, or include the line below
-in your `phpcs.xml.dist` configuration file, if you are using one:
+   Note: the example above will set your `installed_paths` to include only the path to this module's sniffers, which
+   is likely not what you want. You can pass a comma-separated list of paths to the above command, or include the line
+   below in your `phpcs.xml.dist` configuration file:
 
-```
-<config name="installed_paths" value="../../drupal/coder/coder_sniffer,../../sirbrillig/phpcs-variable-analysis,../../slevomat/coding-standard,../../../web/modules/custom/cmc/phpcs" />
-```
-
-If you are using a `phpcs.xml.dist` configuration file in your project, you may
-also want to add the standard directly there:
-
-```
-<rule ref="web/modules/custom/cmc/phpcs/ruleset.xml"/>
-```
-
-Also make sure you allow `twig` as one of the extensions to be sniffed, in case
-you have an `<arg name="extensions">` config value.
-
-3. Run the sniffer:
-   ```bash
-   vendor/bin/phpcs --standard=CMC /path/to/your/templates
+   ```xml
+   <config name="installed_paths" value="../../drupal/coder/coder_sniffer,../../sirbrillig/phpcs-variable-analysis,../../slevomat/coding-standard,../../../web/modules/custom/cmc/phpcs" />
    ```
 
-If you included the standard in your `phpcs.xml.dist` configuration file, you
-can omit the `--standard=CMC` flag mentioned above.
+3. Add the standard to your `phpcs.xml.dist`:
+   ```xml
+   <rule ref="web/modules/custom/cmc/phpcs/ruleset.xml"/>
+   ```
+
+   Also make sure you allow `twig` as one of the extensions to be sniffed, in case you have an `<arg name="extensions">`
+   config value.
+
+4. Run the sniffer:
+   ```bash
+   vendor/bin/phpcs /path/to/your/templates `--standard=CMC`
+   ```
+
+   If you included the standard in your `phpcs.xml.dist` configuration file, you can omit the `--standard=CMC` flag.
+
+
+#### Skip Conditions
+
+The sniff will automatically skip the warning under these conditions:
+
+1. If the template renders the full `content` variable:
+   ```twig
+   {{ content }}
+   ```
+
+2. If the template renders cache metadata explicitly:
+   ```twig
+   {{ content['#cache'] }}
+   ```
+
+3. If you explicitly opt-out using the special comment:
+   ```twig
+   {# cmc_direct_field_access_sniff_opt_out #}
+   ```
+
+#### Example Usage
+
+❌ Not recommended:
+```twig
+{# Direct field access will trigger warning #}
+{{ node.field_image }}
+{{ content.field_tags }}
+{{ media.field_media_image }}
+```
+
+✅ Recommended:
+```twig
+{# Render the full content variable #}
+{{ content }}
+
+{# Render cache metadata & assets explicitly #}
+{{ node.field_image }}
+{{ {'#cache': content['#cache'], '#attached': content['#attached']} }}
+
+{# Or opt-out if you know this is being handled elsewhere #}
+{# cmc_direct_field_access_sniff_opt_out #}
+{{ node.field_special_case }}
+```
 
 Example warning:
 ```
@@ -115,14 +152,7 @@ FILE: /path/to/template.html.twig
 FOUND 1 WARNING AFFECTING 1 LINE
 --------------------------------------------------------------------------------
  15 | WARNING | Direct field access using "node.field_image" is not recommended.
-    |         | Try to always render full variables that come from the backend.
+    |         | Try to always render full render arrays that come from the backend.
 --------------------------------------------------------------------------------
 ```
 
-Instead of direct field access, use:
-```twig
-{# Recommended #}
-{{ content.field_image }}
-
-{# Not recommended #}
-{{ node.field_image.value }}
