@@ -25,11 +25,11 @@ use Symfony\Component\HttpKernel\KernelEvents;
 class LoadedEntitySubscriber implements EventSubscriberInterface {
 
   /**
-   * The module's configuration.
+   * The leak processor.
    *
-   * @var \Drupal\Core\Config\ImmutableConfig
+   * @var \Drupal\cmc\LeakyCache\LeakyCacheInterface
    */
-  protected ImmutableConfig $config;
+  private readonly LeakyCacheInterface $leakProcessor;
 
   /**
    * Class constructor.
@@ -50,7 +50,9 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     protected readonly RequestStack $requestStack,
     protected readonly RouteMatchInterface $routeMatch
   ) {
-    $this->config = $this->configFactory->get('cmc.settings');
+    $this->leakProcessor = $this->factoryLeakProcessor(
+      (string) $this->configFactory->get('cmc.settings')->get('operation_mode')
+    );
   }
 
   /**
@@ -65,13 +67,11 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    *   The response event.
    *
    * @return void
-   *
-   * @throws \Drupal\cmc\Exception\MissingCacheTagsException
    */
   public function onResponse(ResponseEvent $responseEvent): void {
     $tags_from_entities = $this->entityCacheTagCollector->getTagsFromLoadedEntities();
     // Nothing to do if admins disabled this module or there are no tags.
-    if (empty($tags_from_entities)) {
+    if (empty($tags_from_entities) || $this->leakProcessor instanceof NullLeakyCache) {
       return;
     }
 
@@ -102,7 +102,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
       $response->getCacheableMetadata()->getCacheTags(),
     );
     if (!empty($diff)) {
-      $this->factoryLeakProcessor()->processLeaks($diff, $response);
+      $this->leakProcessor->processLeaks($diff, $response);
     }
   }
 
@@ -145,11 +145,13 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
   /**
    * Instantiates the leak processor.
    *
+   * @param string $operation_mode
+   *   The operation mode.
+   *
    * @return \Drupal\cmc\LeakyCache\LeakyCacheInterface
    *   The processor.
    */
-  private function factoryLeakProcessor(): LeakyCacheInterface {
-    $operation_mode = $this->config->get('operation_mode');
+  private function factoryLeakProcessor(string $operation_mode): LeakyCacheInterface {
     return match ($operation_mode) {
       'strict' => new StrictLeakyCache(),
       'errors' => new DisplayLeakyCache(),
