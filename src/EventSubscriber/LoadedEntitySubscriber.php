@@ -5,19 +5,16 @@ declare(strict_types=1);
 namespace Drupal\cmc\EventSubscriber;
 
 use Drupal\cmc\EntityCacheTagCollector;
-use Drupal\cmc\Exception\MissingCacheTagsException;
-use Drupal\content_moderation\Entity\ContentModerationState;
+use Drupal\cmc\LeakyCache\DisplayLeakyCache;
+use Drupal\cmc\LeakyCache\LeakyCacheInterface;
+use Drupal\cmc\LeakyCache\NullLeakyCache;
+use Drupal\cmc\LeakyCache\StrictLeakyCache;
 use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
-use Drupal\Core\Entity\ContentEntityInterface;
-use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Extension\ModuleHandlerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
-use Symfony\Component\DomCrawler\Crawler;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
-use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
@@ -72,9 +69,9 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    * @throws \Drupal\cmc\Exception\MissingCacheTagsException
    */
   public function onResponse(ResponseEvent $responseEvent): void {
-    // Nothing to do if admins disabled this module.
-    $operation_mode = $this->config->get('operation_mode');
-    if ($operation_mode === 'disabled') {
+    $tags_from_entities = $this->entityCacheTagCollector->getTagsFromLoadedEntities();
+    // Nothing to do if admins disabled this module or there are no tags.
+    if (empty($tags_from_entities)) {
       return;
     }
 
@@ -96,27 +93,16 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
 
     // Never fail hard on our own config page to avoid smart users locking
     // themselves out of the house.
-    if (
-      $operation_mode === 'strict'
-      && $this->routeMatch->getRouteName() === 'cmc.settings'
-    ) {
+    if ($this->routeMatch->getRouteName() === 'cmc.settings') {
       return;
     }
 
     $diff = array_diff(
-      $this->entityCacheTagCollector->getTagsFromLoadedEntities(),
+      $tags_from_entities,
       $response->getCacheableMetadata()->getCacheTags(),
     );
     if (!empty($diff)) {
-      if ($operation_mode === 'errors') {
-        $html = $this->generateHtmlErrorMessage($response, $diff);
-        if (!empty($html)) {
-          $response->setContent($html);
-        }
-      }
-      elseif ($operation_mode === 'strict') {
-        throw new MissingCacheTagsException("The following cache tags were not applied to the page: " . implode(", ", $diff));
-      }
+      $this->factoryLeakProcessor()->processLeaks($diff, $response);
     }
   }
 
@@ -127,15 +113,19 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    *   TRUE if the check should be skipped, FALSE otherwise.
    */
   private function shouldSkipAdminCheck(): bool {
-    $isAdminCheckSkipped = $this->config->get('skip_admin') ?? TRUE;
-    if (!$isAdminCheckSkipped) {
+    $skip_admin = $this->config->get('skip_admin') ?? TRUE;
+    if (!$skip_admin) {
       return FALSE;
     }
+    $route = $this->routeMatch->getRouteObject();
+    if ($route?->getOption('_admin_route')) {
+      return TRUE;
+    }
 
-    $currentTheme = $this->themeManager->getActiveTheme()->getName();
-    $adminTheme = $this->configFactory->get('system.theme')->get('admin');
+    $current_theme = $this->themeManager->getActiveTheme()->getName();
+    $admin_theme = $this->configFactory->get('system.theme')->get('admin');
 
-    return $currentTheme === $adminTheme;
+    return $current_theme === $admin_theme;
   }
 
   /**
@@ -153,48 +143,27 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
   }
 
   /**
+   * Instantiates the leak processor.
+   *
+   * @return \Drupal\cmc\LeakyCache\LeakyCacheInterface
+   *   The processor.
+   */
+  private function factoryLeakProcessor(): LeakyCacheInterface {
+    $operation_mode = $this->config->get('operation_mode');
+    return match ($operation_mode) {
+      'strict' => new StrictLeakyCache(),
+      'errors' => new DisplayLeakyCache(),
+      default => new NullLeakyCache(),
+    };
+  }
+
+  /**
    * {@inheritdoc}
    */
   public static function getSubscribedEvents() {
     return [
       KernelEvents::RESPONSE => 'onResponse',
     ];
-  }
-
-  /**
-   * Prepend a message to the response's markup indicating missing cache tags.
-   *
-   * @param \Drupal\Core\Cache\CacheableResponseInterface $response
-   *   The response object.
-   * @param array $diff
-   *   The missing cache tags.
-   *
-   * @return string
-   *   The full response's content, with the missing cache tags prepended.
-   */
-  private function generateHtmlErrorMessage(CacheableResponseInterface $response, array $diff): string {
-    $html = '';
-    $crawler = new Crawler($response->getContent());
-    $body = $crawler->filterXPath('//body');
-    if ($body->count() > 0) {
-      $tags_markup = implode('</pre></li><li><pre>', $diff);
-      $errors = <<<MARKUP
-<div id="cmc-errors">
-  <h2>The following cache tags were not applied to the page:</h2>
-  <ol>
-    <li><pre>
-    {$tags_markup}
-    </pre></li>
-  </ol>
-</div>
-MARKUP;
-      $html = preg_replace(
-        '/<body([^>]*)>/i',
-        '<body$1>' . $errors,
-        $response->getContent()
-      );
-    }
-    return $html;
   }
 
 }
