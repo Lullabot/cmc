@@ -42,7 +42,7 @@ class DisplayLeakyCache implements LeakyCacheInterface{
   </div>
   <div style="padding: 0 20px 20px;">
     <p>The following entity cache tags are missing from the response:</p>
-    <ul>
+    <ul style="margin: 0">
       <li><pre>
       {$tags_markup}
       </pre></li>
