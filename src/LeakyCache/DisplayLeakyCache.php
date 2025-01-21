@@ -35,14 +35,20 @@ class DisplayLeakyCache implements LeakyCacheInterface{
     if ($body->count() > 0) {
       $tags_markup = implode('</pre></li><li><pre>', $leaks);
       $errors = <<<MARKUP
-<div id="cmc-errors">
-  <h2>The following cache tags were not applied to the page:</h2>
-  <ol>
-    <li><pre>
-    {$tags_markup}
-    </pre></li>
-  </ol>
-</div>
+<dialog open id="cmc-errors" style="display: flex; flex-direction: column; justify-content: center; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); border: 1px solid black; border-radius: 4px; box-shadow: 0 0 5px black">
+  <div style="font-size: 1.4em; font-weight: bold">Some cache tags are missing</div>
+  <div>
+    <p>The following entity cache tags are missing from the response:</p>
+    <ul>
+      <li><pre>
+      {$tags_markup}
+      </pre></li>
+    </ul>
+  </div>
+  <div style="display: flex; justify-content: flex-end; width: 100%">
+    <button class="button button--primary" onclick="document.getElementById('cmc-errors').close()">Close</button>
+  </div>
+</dialog>
 MARKUP;
       $html = preg_replace(
         '/<body([^>]*)>/i',
