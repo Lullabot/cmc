@@ -25,6 +25,13 @@ use Symfony\Component\HttpKernel\KernelEvents;
 class LoadedEntitySubscriber implements EventSubscriberInterface {
 
   /**
+   * The module's configuration.
+   *
+   * @var \Drupal\Core\Config\ImmutableConfig
+   */
+  protected ImmutableConfig $config;
+
+  /**
    * The leak processor.
    *
    * @var \Drupal\cmc\LeakyCache\LeakyCacheInterface
@@ -50,8 +57,9 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     protected readonly RequestStack $requestStack,
     protected readonly RouteMatchInterface $routeMatch
   ) {
+    $this->config = $this->configFactory->get('cmc.settings');
     $this->leakProcessor = $this->factoryLeakProcessor(
-      (string) $this->configFactory->get('cmc.settings')->get('operation_mode')
+      (string) $this->config->get('operation_mode')
     );
   }
 
