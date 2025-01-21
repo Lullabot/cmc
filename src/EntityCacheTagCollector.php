@@ -3,7 +3,7 @@
 namespace Drupal\cmc;
 
 use Drupal\Core\Entity\EntityInterface;
-use Drupal\Core\Extension\ModuleHandler;
+use Drupal\Core\Extension\ModuleHandlerInterface;
 
 class EntityCacheTagCollector {
 
@@ -14,7 +14,7 @@ class EntityCacheTagCollector {
    */
   private array $tagsFromLoadedEntities = [];
 
-  public function __construct(private readonly ModuleHandler $moduleHandler) {}
+  public function __construct(private readonly ModuleHandlerInterface $moduleHandler) {}
 
   /**
    * Registers cache tags for a given entity.
