@@ -8,6 +8,7 @@
 declare(strict_types=1);
 
 use Drupal\cmc\EntityCacheTagCollector;
+use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
 
 /**
@@ -18,10 +19,9 @@ function cmc_entity_load(array $entities, $entity_type_id) {
   if ($is_disabled) {
     return;
   }
-  foreach ($entities as $entity) {
-    assert($entity instanceof EntityInterface);
-    $entity_cache_tag_collector = \Drupal::service(EntityCacheTagCollector::class);
-    assert($entity_cache_tag_collector instanceof EntityCacheTagCollector);
-    $entity_cache_tag_collector->registerLoadedEntity($entity);
-  }
+  $entity_cache_tag_collector = \Drupal::service(EntityCacheTagCollector::class);
+  assert($entity_cache_tag_collector instanceof EntityCacheTagCollector);
+
+  $content_entities = array_filter($entities, static fn (EntityInterface $entity) => $entity instanceof ContentEntityInterface);
+  array_map([$entity_cache_tag_collector, 'registerLoadedEntity'], $content_entities);
 }
