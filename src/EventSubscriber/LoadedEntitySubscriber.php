@@ -130,20 +130,22 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
   }
 
   /**
-   * Removes entity cache tags that are covered by list cache tags.
+   * Removes entity tags that are covered by list cache tags from the response.
    *
-   * This method processes the provided tags from entities and tags from a
-   * response to identify and remove entity-specific cache tags that are already
-   * covered by broader list cache tags, thereby reducing redundancy in cache
-   * tags.
+   * This method filters out entity-specific cache tags from a given list based
+   * on the list cache tags present in the response. Entity-specific tags are
+   * those that match an entity type ID followed by a colon. If the list cache
+   * tags exist in the response, any matching entity tags are removed.
    *
    * @param string[] $tags_from_entities
-   *   An array of cache tags associated with individual entities.
+   *   An array of cache tags corresponding to specific entities.
    * @param string[] $tags_from_response
-   *   An array of cache tags included in the response.
+   *   An array of cache tags derived from the response, including list cache
+   *   tags.
    *
    * @return string[]
-   *   An array of cache tags, excluding those that are covered by list tags.
+   *   An array of cache tags with entity-specific tags removed if they are
+   *   covered by the list cache tags from the response.
    */
   private function removeEntitiesWithListTag(array $tags_from_entities, array $tags_from_response): array {
     $entity_types = $this->entityTypeManager->getDefinitions();
@@ -158,11 +160,10 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
         ...$carry,
         // Gather the entity type ID, as well as the list tag. This is so we can
         // detect the entities of a certain type later.
-        ...array_map(fn (string $list_tag) => [$entity_type->id(), $list_tag], [
-          // Consider the list tags from the entity type, and the list builder.
-          ...$entity_type->getListCacheTags(),
-          ...$this->entityTypeManager->getViewBuilder($entity_type->id())->getCacheTags(),
-        ]),
+        ...array_map(
+          fn (string $list_tag) => [$entity_type->id(), $list_tag],
+          $entity_type->getListCacheTags(),
+        ),
       ],
       [],
     );
