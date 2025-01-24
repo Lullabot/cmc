@@ -157,6 +157,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
       $entity_types,
       static fn (EntityTypeInterface $entity_type) => $entity_type instanceof ContentEntityTypeInterface,
     );
+    // Create a list like [['node', 'node_list'], ['media', 'media_list'], etc].
     $all_entity_list_tag_pairs = array_reduce(
       $content_entity_types,
       fn (array $carry, EntityTypeInterface $entity_type) => [
