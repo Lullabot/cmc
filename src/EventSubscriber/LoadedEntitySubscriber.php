@@ -86,8 +86,11 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    * @return void
    */
   public function onResponse(ResponseEvent $response_event): void {
-    // Only do this for the master request.
-    if ($response_event->getRequest()->isXmlHttpRequest()) {
+    // Avoid Ajax and sub-requests.
+    if (
+      $response_event->getRequest()->isXmlHttpRequest()
+      || !$response_event->isMainRequest()
+    ) {
       return;
     }
 
