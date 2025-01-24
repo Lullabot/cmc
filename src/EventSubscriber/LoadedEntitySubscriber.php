@@ -80,14 +80,14 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    * differences, will either display an error message or fail hard, indicating
    * in both cases the missing tags.
    *
-   * @param \Symfony\Component\HttpKernel\Event\ResponseEvent $responseEvent
+   * @param \Symfony\Component\HttpKernel\Event\ResponseEvent $response_event
    *   The response event.
    *
    * @return void
    */
-  public function onResponse(ResponseEvent $responseEvent): void {
+  public function onResponse(ResponseEvent $response_event): void {
     // Only do this for the master request.
-    if ($responseEvent->getRequest()->isXmlHttpRequest()) {
+    if ($response_event->getRequest()->isXmlHttpRequest()) {
       return;
     }
 
@@ -102,7 +102,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     }
 
     // Abort if this response does not contain cache metadata.
-    $response = $responseEvent->getResponse();
+    $response = $response_event->getResponse();
     if (!($response instanceof CacheableResponseInterface)) {
       return;
     }
