@@ -9,9 +9,13 @@ use Drupal\cmc\LeakyCache\DisplayLeakyCache;
 use Drupal\cmc\LeakyCache\LeakyCacheInterface;
 use Drupal\cmc\LeakyCache\NullLeakyCache;
 use Drupal\cmc\LeakyCache\StrictLeakyCache;
+use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
+use Drupal\Core\Entity\ContentEntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeInterface;
+use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
@@ -41,6 +45,10 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
   /**
    * Class constructor.
    *
+   * @param \Drupal\cmc\EntityCacheTagCollector $entityCacheTagCollector
+   *   The entity cache tag collector.
+   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
+   *   The entity type manager.
    * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
    *   The config factory service.
    * @param \Drupal\Core\Theme\ThemeManagerInterface $themeManager
@@ -52,10 +60,11 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    */
   public function __construct(
     protected readonly EntityCacheTagCollector $entityCacheTagCollector,
+    protected readonly EntityTypeManagerInterface $entityTypeManager,
     protected readonly ConfigFactoryInterface $configFactory,
     protected readonly ThemeManagerInterface $themeManager,
     protected readonly RequestStack $requestStack,
-    protected readonly RouteMatchInterface $routeMatch
+    protected readonly RouteMatchInterface $routeMatch,
   ) {
     $this->config = $this->configFactory->get('cmc.settings');
     $this->leakProcessor = $this->factoryLeakProcessor(
@@ -71,12 +80,20 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    * differences, will either display an error message or fail hard, indicating
    * in both cases the missing tags.
    *
-   * @param \Symfony\Component\HttpKernel\Event\ResponseEvent $responseEvent
+   * @param \Symfony\Component\HttpKernel\Event\ResponseEvent $response_event
    *   The response event.
    *
    * @return void
    */
-  public function onResponse(ResponseEvent $responseEvent): void {
+  public function onResponse(ResponseEvent $response_event): void {
+    // Avoid Ajax and sub-requests.
+    if (
+      $response_event->getRequest()->isXmlHttpRequest()
+      || !$response_event->isMainRequest()
+    ) {
+      return;
+    }
+
     $tags_from_entities = $this->entityCacheTagCollector->getTagsFromLoadedEntities();
     // Nothing to do if admins disabled this module or there are no tags.
     if (empty($tags_from_entities) || $this->leakProcessor instanceof NullLeakyCache) {
@@ -88,7 +105,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     }
 
     // Abort if this response does not contain cache metadata.
-    $response = $responseEvent->getResponse();
+    $response = $response_event->getResponse();
     if (!($response instanceof CacheableResponseInterface)) {
       return;
     }
@@ -104,14 +121,83 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     if ($this->routeMatch->getRouteName() === 'cmc.settings') {
       return;
     }
+    // If the response contains the cache tag for the entity list, then none of
+    // the individual entities for that type should be reported.
+    $tags_from_response = $response->getCacheableMetadata()->getCacheTags();
+    $tags_from_entities = $this->removeEntitiesWithListTag($tags_from_entities, $tags_from_response);
 
-    $diff = array_diff(
-      $tags_from_entities,
-      $response->getCacheableMetadata()->getCacheTags(),
-    );
+    $diff = array_diff($tags_from_entities, $tags_from_response);
     if (!empty($diff)) {
       $this->leakProcessor->processLeaks($diff, $response);
     }
+  }
+
+  /**
+   * Removes entity tags that are covered by list cache tags from the response.
+   *
+   * This method filters out entity-specific cache tags from a given list based
+   * on the list cache tags present in the response. Entity-specific tags are
+   * those that match an entity type ID followed by a colon. If the list cache
+   * tags exist in the response, any matching entity tags are removed.
+   *
+   * @param string[] $tags_from_entities
+   *   An array of cache tags corresponding to specific entities.
+   * @param string[] $tags_from_response
+   *   An array of cache tags derived from the response, including list cache
+   *   tags.
+   *
+   * @return string[]
+   *   An array of cache tags with entity-specific tags removed if they are
+   *   covered by the list cache tags from the response.
+   */
+  private function removeEntitiesWithListTag(array $tags_from_entities, array $tags_from_response): array {
+    $entity_types = $this->entityTypeManager->getDefinitions();
+    // Ensure we are dealing with content entity types.
+    $content_entity_types = array_filter(
+      $entity_types,
+      static fn (EntityTypeInterface $entity_type) => $entity_type instanceof ContentEntityTypeInterface,
+    );
+    // Create a list like [['node', 'node_list'], ['media', 'media_list'], etc].
+    $all_entity_list_tag_pairs = array_reduce(
+      $content_entity_types,
+      fn (array $carry, EntityTypeInterface $entity_type) => [
+        ...$carry,
+        // Gather the entity type ID, as well as the list tag. This is so we can
+        // detect the entities of a certain type later.
+        ...array_map(
+          fn (string $list_tag) => [$entity_type->id(), $list_tag],
+          $entity_type->getListCacheTags(),
+        ),
+      ],
+      [],
+    );
+    // Now detect which ones are in the response. We cannot intersect the arrays
+    // because we want to detect the bundle-specific cache tags. Like:
+    // node_list:article.
+    // @see https://www.drupal.org/node/3107058
+    $list_tags_from_response = array_filter(
+      $all_entity_list_tag_pairs,
+      static fn (array $list_tag_pair) => array_reduce(
+        $tags_from_response,
+        static fn (bool $found, string $cache_tag) => $found || str_starts_with($cache_tag, $list_tag_pair[1]),
+        FALSE
+      ),
+    );
+    // Remove individual entity tags that are covered by the list tags.
+    $entity_types_to_remove_tags = array_unique(
+      array_map(static fn (array $list_tag_pair) => $list_tag_pair[0], $list_tags_from_response),
+    );
+    return array_filter(
+      $tags_from_entities,
+      // Only the tags that don't start with one of the entity types from the
+      // list are returned.
+      static fn (string $cache_tag) => !array_reduce(
+        $entity_types_to_remove_tags,
+        // For each $cache_tag check if they start with '{entity_type_id}:'.
+        static fn (bool $found, string $entity_type_id) => $found || str_starts_with($cache_tag, $entity_type_id . ':'),
+        FALSE
+      )
+    );
   }
 
   /**
