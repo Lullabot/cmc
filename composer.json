@@ -1,0 +1,23 @@
+{
+  "name": "lullabot/cmc",
+  "description": "Tools for checking cacheability metadata in Drupal",
+  "type": "drupal-module",
+  "license": "proprietary",
+  "copyright": "Copyright (c) Lullabot",
+  "minimum-stability": "dev",
+  "require": {
+    "php": ">=8.1",
+    "drupal/core": "^10 || ^11"
+  },
+  "support": {
+    "issues": "https://github.com/lullabot/cmc/issues",
+    "source": "https://github.com/lullabot/cmc"
+  },
+  "keywords": [
+    "drupal",
+    "cache",
+    "cacheability",
+    "metadata",
+    "development"
+  ]
+}
