@@ -26,10 +26,12 @@ class EntityCacheTagCollector {
     if (!$this->shouldTrack($entity)) {
       return;
     }
-    $this->tagsFromLoadedEntities = array_unique([
+    $cache_tags = $entity->getCacheTags();
+    $entity_tag_pairs = array_map(static fn (string $tag) => [$tag, $entity], $cache_tags);
+    $this->tagsFromLoadedEntities = [
       ...$this->tagsFromLoadedEntities,
-      ...$entity->getCacheTags(),
-    ]);
+      ...$entity_tag_pairs,
+    ];
   }
 
   /**

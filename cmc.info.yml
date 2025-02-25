@@ -3,3 +3,4 @@ type: module
 description: Tools for checking cacheability metadata in Drupal
 package: Lullabot Tools
 core_version_requirement: ^10 || ^11
+configure: cmc.settings

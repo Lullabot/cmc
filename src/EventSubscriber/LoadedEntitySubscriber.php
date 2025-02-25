@@ -9,17 +9,22 @@ use Drupal\cmc\LeakyCache\DisplayLeakyCache;
 use Drupal\cmc\LeakyCache\LeakyCacheInterface;
 use Drupal\cmc\LeakyCache\NullLeakyCache;
 use Drupal\cmc\LeakyCache\StrictLeakyCache;
+use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
+use Drupal\Component\Plugin\Exception\PluginNotFoundException;
 use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
 use Drupal\Core\Entity\ContentEntityTypeInterface;
+use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
+use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -65,6 +70,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     protected readonly ThemeManagerInterface $themeManager,
     protected readonly RequestStack $requestStack,
     protected readonly RouteMatchInterface $routeMatch,
+    protected readonly AccountProxyInterface $currentUser,
   ) {
     $this->config = $this->configFactory->get('cmc.settings');
     $this->leakProcessor = $this->factoryLeakProcessor(
@@ -94,9 +100,9 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
       return;
     }
 
-    $tags_from_entities = $this->entityCacheTagCollector->getTagsFromLoadedEntities();
+    $collected_entity_tag_pairs = $this->entityCacheTagCollector->getTagsFromLoadedEntities();
     // Nothing to do if admins disabled this module or there are no tags.
-    if (empty($tags_from_entities) || $this->leakProcessor instanceof NullLeakyCache) {
+    if (empty($collected_entity_tag_pairs) || $this->leakProcessor instanceof NullLeakyCache) {
       return;
     }
 
@@ -124,9 +130,21 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     // If the response contains the cache tag for the entity list, then none of
     // the individual entities for that type should be reported.
     $tags_from_response = $response->getCacheableMetadata()->getCacheTags();
-    $tags_from_entities = $this->removeEntitiesWithListTag($tags_from_entities, $tags_from_response);
+    $tags_from_entities = $this->removeEntitiesWithListTag(
+      $collected_entity_tag_pairs,
+      $tags_from_response,
+    );
 
     $diff = array_diff($tags_from_entities, $tags_from_response);
+    // Exclude the current user, since it may only be loaded for access check
+    // purposes.
+    try {
+      $user = $this->entityTypeManager
+        ->getStorage('user')
+        ->load($this->currentUser->id());
+      $diff = array_diff($diff, $user->getCacheTags());
+    }
+    catch (InvalidPluginDefinitionException|PluginNotFoundException  $e) {}
     if (!empty($diff)) {
       $this->leakProcessor->processLeaks($diff, $response);
     }
@@ -140,8 +158,8 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    * those that match an entity type ID followed by a colon. If the list cache
    * tags exist in the response, any matching entity tags are removed.
    *
-   * @param string[] $tags_from_entities
-   *   An array of cache tags corresponding to specific entities.
+   * @param array $tag_pairs_from_entities
+   *   Pairs of [tag, entity] collected.
    * @param string[] $tags_from_response
    *   An array of cache tags derived from the response, including list cache
    *   tags.
@@ -150,12 +168,12 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    *   An array of cache tags with entity-specific tags removed if they are
    *   covered by the list cache tags from the response.
    */
-  private function removeEntitiesWithListTag(array $tags_from_entities, array $tags_from_response): array {
+  private function removeEntitiesWithListTag(array $tag_pairs_from_entities, array $tags_from_response): array {
     $entity_types = $this->entityTypeManager->getDefinitions();
     // Ensure we are dealing with content entity types.
     $content_entity_types = array_filter(
       $entity_types,
-      static fn (EntityTypeInterface $entity_type) => $entity_type instanceof ContentEntityTypeInterface,
+      static fn (EntityTypeInterface $entity_type) => $entity_type->getConfigDependencyKey() === 'content'
     );
     // Create a list like [['node', 'node_list'], ['media', 'media_list'], etc].
     $all_entity_list_tag_pairs = array_reduce(
@@ -187,17 +205,18 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     $entity_types_to_remove_tags = array_unique(
       array_map(static fn (array $list_tag_pair) => $list_tag_pair[0], $list_tags_from_response),
     );
-    return array_filter(
-      $tags_from_entities,
-      // Only the tags that don't start with one of the entity types from the
-      // list are returned.
-      static fn (string $cache_tag) => !array_reduce(
-        $entity_types_to_remove_tags,
-        // For each $cache_tag check if they start with '{entity_type_id}:'.
-        static fn (bool $found, string $entity_type_id) => $found || str_starts_with($cache_tag, $entity_type_id . ':'),
-        FALSE
-      )
-    );
+    $tags_from_entities = [];
+    foreach ($tag_pairs_from_entities as $tag_pair) {
+      $entity = $tag_pair[1] ?? NULL;
+      if (
+        !$entity instanceof EntityInterface
+        || in_array($entity->getEntityTypeId(), $entity_types_to_remove_tags)
+      ) {
+        continue;
+      }
+      $tags_from_entities[] = $tag_pair[0] ?? NULL;
+    }
+    return array_unique(array_filter($tags_from_entities));
   }
 
   /**
