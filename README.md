@@ -3,6 +3,29 @@
 A Drupal module that helps developers identify missing cache tags in their pages by tracking loaded entities and
 verifying their cache tags are properly bubbled up to the response.
 
+## Getting Started
+
+1. Add this repository to your composer.json:
+   ```bash
+   composer config repositories.cmc --json '{"type": "vcs", "url": "git@github.com:Lullabot/cmc.git"}'
+   ```
+
+2. Set minimum stability to dev (if needed):
+   ```bash
+   composer config minimum-stability dev
+   ```
+
+3. Require the module:
+   ```bash
+   composer require lullabot/cmc
+   ```
+
+4. Enable the module:
+   ```bash
+   drush en cmc
+   ```
+
+
 ## Features
 
 - Tracks loaded entities and their cache tags, compares with tags bubbled to the HTTP response object
