@@ -10,6 +10,7 @@ declare(strict_types=1);
 use Drupal\cmc\EntityCacheTagCollector;
 use Drupal\Core\Entity\ContentEntityInterface;
 use Drupal\Core\Entity\EntityInterface;
+use Drupal\content_moderation\Entity\ContentModerationState;
 
 /**
  * Implements hook_entity_load().
@@ -28,4 +29,15 @@ function cmc_entity_load(array $entities, $entity_type_id) {
       $entity->getConfigDependencyKey() === 'content'
   );
   array_map([$entity_cache_tag_collector, 'registerLoadedEntity'], $content_entities);
+}
+
+/**
+ * Implements hook_cmc_skip_tracking().
+ */
+function cmc_cmc_skip_tracking(EntityInterface $entity): bool {
+  if ($entity instanceof ContentModerationState) {
+    return true;
+  } else {
+    return false;
+  }
 }
