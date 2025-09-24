@@ -2,6 +2,7 @@
 
 namespace Drupal\cmc;
 
+use Drupal\content_moderation\Entity\ContentModerationStateInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
 
@@ -41,6 +42,10 @@ class EntityCacheTagCollector {
    *   TRUE if this entity should be tracked, FALSE otherwise.
    */
   private function shouldTrack(EntityInterface $entity): bool {
+    // There are certain entities we won't track by default.
+    if ($entity instanceof ContentModerationStateInterface) {
+      return FALSE;
+    }
     // Allow modules to modify this.
     $skip = $this->moduleHandler->invokeAll('cmc_skip_tracking', [$entity]);
     // If at least one module wants to skip the tracking, bail out.
