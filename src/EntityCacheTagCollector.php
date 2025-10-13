@@ -5,6 +5,8 @@ namespace Drupal\cmc;
 use Drupal\content_moderation\Entity\ContentModerationStateInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Extension\ModuleHandlerInterface;
+use Drupal\user\Entity\User;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 class EntityCacheTagCollector {
 
@@ -15,7 +17,10 @@ class EntityCacheTagCollector {
    */
   private array $tagsFromLoadedEntities = [];
 
-  public function __construct(private readonly ModuleHandlerInterface $moduleHandler) {}
+  public function __construct(
+    private readonly ModuleHandlerInterface $moduleHandler,
+    private readonly RequestStack $requestStack,
+  ) {}
 
   /**
    * Registers cache tags for a given entity.
@@ -45,6 +50,13 @@ class EntityCacheTagCollector {
     // There are certain entities we won't track by default.
     if ($entity instanceof ContentModerationStateInterface) {
       return FALSE;
+    }
+
+    if ($entity instanceof User) {
+      $request = $this->requestStack->getCurrentRequest();
+      if ($request && $request->request->get('form_id') === 'user_login_form') {
+        return FALSE;
+      }
     }
     // Allow modules to modify this.
     $skip = $this->moduleHandler->invokeAll('cmc_skip_tracking', [$entity]);
