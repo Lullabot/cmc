@@ -4,7 +4,4 @@
 
   <!-- Include our custom sniffs -->
   <rule ref="./Sniffs/Twig/DirectFieldAccessSniff.php"/>
-
-  <!-- Define file extensions to check -->
-  <arg name="extensions" value="html.twig"/>
 </ruleset>
