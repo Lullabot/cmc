@@ -5,6 +5,8 @@
   <!-- Include our custom sniffs -->
   <rule ref="./Sniffs/Twig/DirectFieldAccessSniff.php"/>
 
-  <!-- Define file extensions to check -->
-  <arg name="extensions" value="html.twig"/>
+  <rule ref="Internal.NoCodeFound">
+    <!-- Empty files are fine, might be used for testing. -->
+    <exclude-pattern>*</exclude-pattern>
+  </rule>
 </ruleset>
