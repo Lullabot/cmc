@@ -36,7 +36,7 @@ class CmcSettingsForm extends ConfigFormBase {
     $form['operation_mode'] = [
       '#type' => 'select',
       '#title' => $this->t('Operation mode'),
-      '#description' => $this->t('<b>Display errors:</b> Will inject missing tags at the top of each failing page.<br><b>Strict:</b> Will throw an exception when there are missing cache tags on a page.'),
+      '#description' => $this->t('<b>Display errors:</b> Will display missing cache tags as an error message at the top of each failing page.<br><b>Strict:</b> Will throw an exception when there are missing cache tags on a page.'),
       '#options' => [
         'disabled' => $this->t('Disabled'),
         'errors' => $this->t('Display errors'),
