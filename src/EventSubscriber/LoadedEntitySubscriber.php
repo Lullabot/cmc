@@ -11,20 +11,18 @@ use Drupal\cmc\LeakyCache\NullLeakyCache;
 use Drupal\cmc\LeakyCache\StrictLeakyCache;
 use Drupal\Component\Plugin\Exception\InvalidPluginDefinitionException;
 use Drupal\Component\Plugin\Exception\PluginNotFoundException;
-use Drupal\Core\Cache\CacheableDependencyInterface;
 use Drupal\Core\Cache\CacheableResponseInterface;
 use Drupal\Core\Config\ConfigFactoryInterface;
 use Drupal\Core\Config\ImmutableConfig;
-use Drupal\Core\Entity\ContentEntityTypeInterface;
 use Drupal\Core\Entity\EntityInterface;
 use Drupal\Core\Entity\EntityTypeInterface;
 use Drupal\Core\Entity\EntityTypeManagerInterface;
+use Drupal\Core\Messenger\MessengerInterface;
 use Drupal\Core\Routing\RouteMatchInterface;
 use Drupal\Core\Session\AccountProxyInterface;
 use Drupal\Core\Theme\ThemeManagerInterface;
 use Symfony\Component\EventDispatcher\EventSubscriberInterface;
 use Symfony\Component\HttpFoundation\RequestStack;
-use Symfony\Component\HttpFoundation\Session\SessionInterface;
 use Symfony\Component\HttpKernel\Event\ResponseEvent;
 use Symfony\Component\HttpKernel\KernelEvents;
 
@@ -47,22 +45,6 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
    */
   private readonly LeakyCacheInterface $leakProcessor;
 
-  /**
-   * Class constructor.
-   *
-   * @param \Drupal\cmc\EntityCacheTagCollector $entityCacheTagCollector
-   *   The entity cache tag collector.
-   * @param \Drupal\Core\Entity\EntityTypeManagerInterface $entityTypeManager
-   *   The entity type manager.
-   * @param \Drupal\Core\Config\ConfigFactoryInterface $configFactory
-   *   The config factory service.
-   * @param \Drupal\Core\Theme\ThemeManagerInterface $themeManager
-   *   The theme manager service.
-   * @param \Symfony\Component\HttpFoundation\RequestStack $requestStack
-   *   The request stack.
-   * @param \Drupal\Core\Routing\RouteMatchInterface $routeMatch
-   *   The route match object.
-   */
   public function __construct(
     protected readonly EntityCacheTagCollector $entityCacheTagCollector,
     protected readonly EntityTypeManagerInterface $entityTypeManager,
@@ -71,6 +53,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
     protected readonly RequestStack $requestStack,
     protected readonly RouteMatchInterface $routeMatch,
     protected readonly AccountProxyInterface $currentUser,
+    protected readonly MessengerInterface $messenger,
   ) {
     $this->config = $this->configFactory->get('cmc.settings');
     $this->leakProcessor = $this->factoryLeakProcessor(
@@ -267,7 +250,7 @@ class LoadedEntitySubscriber implements EventSubscriberInterface {
   private function factoryLeakProcessor(string $operation_mode): LeakyCacheInterface {
     return match ($operation_mode) {
       'strict' => new StrictLeakyCache(),
-      'errors' => new DisplayLeakyCache(),
+      'errors' => new DisplayLeakyCache($this->messenger),
       default => new NullLeakyCache(),
     };
   }
